@@ -1,5 +1,6 @@
 
 
+
 import React, { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 import { Course, LearningPath, Level, EditableItem, ItemType, ParentId, Document } from '../types';
@@ -7,6 +8,7 @@ import { UI_STRINGS } from '../constants';
 import { DocumentLink } from './DocumentLink';
 import { Badge } from './common/Badge';
 import { Pencil, Trash2, PlusCircle, Calendar, Users, Wrench, Code, ArrowLeft, ChevronDown, BookOpen, FileText } from 'lucide-react';
+import { useSwipeBack } from '../hooks/useSwipeBack';
 
 interface CourseDetailViewProps {
   course: Course;
@@ -76,6 +78,7 @@ const LevelAccordion: React.FC<{
 export const CourseDetailView: React.FC<CourseDetailViewProps> = ({ course, path, onEdit, onClose }) => {
   const context = useContext(AppContext);
   const [openLevelId, setOpenLevelId] = useState<string | null>(null);
+  const swipeBackRef = useSwipeBack(onClose);
 
   if (!context) return null;
   
@@ -101,7 +104,7 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({ course, path
   }
 
   return (
-    <main className="flex-1 p-6 md:p-10 overflow-y-auto animate-fadeIn">
+    <main ref={swipeBackRef} className="flex-1 p-6 md:p-10 overflow-y-auto animate-fadeIn">
       <div className="max-w-7xl mx-auto">
         <button onClick={onClose} className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-6 font-semibold transition-colors">
           <ArrowLeft size={20} />
