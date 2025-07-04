@@ -1,7 +1,7 @@
 import { LearningPath, LevelName, DocumentCategory, LearningPathName } from './types';
 
 export const UI_STRINGS = {
-  appName: "CMS Tài liệu khóa học",
+  appName: "MindX - CMS",
   home: "Trang chủ",
   learningPaths: "Lộ trình học",
   courses: "Các khóa học",
