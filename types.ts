@@ -88,6 +88,11 @@ export interface AppContextType {
   selectedCourseId: string | null;
   setSelectedCourseId: (id: string | null) => void;
 
+  // Edit mode
+  hasUnsavedChanges: boolean;
+  saveChanges: () => void;
+  discardChanges: () => void;
+
   // CRUD operations
   addCourse: (pathId: string, courseData: Omit<Course, 'id' | 'levels' | 'documents'>) => void;
   updateCourse: (pathId: string, courseId: string, updates: Partial<Course>) => void;
