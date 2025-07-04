@@ -22,7 +22,7 @@ function App() {
         <Header onMobileMenuOpen={() => setMobileMenuOpen(true)} />
         <MainContent />
         <footer className="text-center p-2 text-sm text-gray-500 dark:text-gray-400">
-            Research & Development - K12
+            Research & Development K12 Dept. - MindX
         </footer>
       </div>
     </div>
