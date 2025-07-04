@@ -5,7 +5,7 @@ const SWIPE_THRESHOLD_Y = 70; // max vertical pixels to allow for a swipe
 const SWIPE_TIMEOUT = 500; // max ms for a swipe
 
 /**
- * A hook to detect a leftward swipe on a given element to trigger a "back" action.
+ * A hook to detect a rightward swipe on a given element to trigger a "back" action.
  * @param onSwipeBack The callback function to execute on a successful swipe.
  * @param enabled A boolean to enable or disable the swipe detection.
  * @returns A ref object to be attached to the target DOM element.
@@ -45,8 +45,8 @@ export const useSwipeBack = (onSwipeBack: () => void, enabled: boolean = true) =
             const deltaTime = touchEndTime - touchStartTime;
 
             if (deltaTime < SWIPE_TIMEOUT) {
-                // Check for a leftward swipe (finger moves from right to left)
-                if (deltaX < -SWIPE_THRESHOLD_X && deltaY < SWIPE_THRESHOLD_Y) {
+                // Check for a rightward swipe (finger moves from left to right)
+                if (deltaX > SWIPE_THRESHOLD_X && deltaY < SWIPE_THRESHOLD_Y) {
                     onSwipeBack();
                 }
             }
