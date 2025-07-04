@@ -13,7 +13,7 @@ type UserCredential = {
 export const USER_CREDENTIALS: UserCredential[] = [
   {
     username: 'admin',
-    password: 'admin',
+    password: 'r&dk1@@025',
     role: 'admin'
   },
   {
