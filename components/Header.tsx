@@ -1,13 +1,16 @@
+import { LogIn, LogOut, Menu } from 'lucide-react';
+import React, { useContext, useState } from 'react';
 
-import React, { useState, useContext } from 'react';
-import { LogIn, LogOut } from 'lucide-react';
 import { AppContext } from '../context/AppContext';
-import { UI_STRINGS } from '../constants';
-import { Logo } from './common/Logo';
 import { LoginModal } from './LoginModal';
-import { SearchModal } from './SearchModal';
+import { Logo } from './common/Logo';
+import { UI_STRINGS } from '../constants';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onMobileMenuOpen: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onMobileMenuOpen }) => {
   const [isLoginModalOpen, setLoginModalOpen] = useState(false);
   const context = useContext(AppContext);
 
@@ -17,14 +20,28 @@ export const Header: React.FC = () => {
 
   const { currentUser, logout } = context;
 
+  const isDarkMode = document.documentElement.classList.contains('dark');
+
+
   const handleLoginClick = () => setLoginModalOpen(true);
   const handleLogoutClick = () => logout();
 
   return (
     <>
-      <header className="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white p-4 flex items-center justify-between sticky top-0 z-40">
-        {/* Left side Logo */}
-        <Logo className="h-10 w-10" />
+      <header className="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white p-4 flex items-center justify-between sticky top-0 z-30">
+        {/* Left side: Mobile Menu Toggle + Logo */}
+        <div className="flex items-center gap-2">
+            <button 
+              onClick={onMobileMenuOpen} 
+              className="p-2 -ml-2 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors md:hidden"
+              aria-label="Open menu"
+            >
+              <Menu size={24} />
+            </button>
+          {/* <Logo className="h-10 w-10" /> */}
+          <Logo className="w-8 h-8" isDarkMode={isDarkMode} />
+
+        </div>
 
         {/* Right side */}
         <div className="flex items-center gap-2">

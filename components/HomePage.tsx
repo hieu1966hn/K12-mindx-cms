@@ -37,16 +37,19 @@ export const HomePage: React.FC = () => {
     }
     
     return (
-        <main className="flex-1 p-8 overflow-y-auto bg-gray-100 dark:bg-gray-900">
+        <main className="flex-1 p-8 overflow-y-auto bg-gray-100 dark:bg-gray-900 animate-fadeIn">
             <div className="text-center max-w-4xl mx-auto py-10">
-                <h2 className="text-4xl md:text-5xl font-extrabold text-gray-800 dark:text-gray-100">{UI_STRINGS.homeTitle}</h2>
+                <h2 className="text-4xl md:text-5xl font-extrabold">
+                    <span className="text-[#E31F26]">MindX Technology School</span>
+                    <span className="text-gray-800 dark:text-gray-200"> - CMS</span>
+                </h2>
                 <p className="mt-4 text-lg text-gray-500 dark:text-gray-400">{UI_STRINGS.homeSubtitle}</p>
                 <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
                     {data.map(path => {
                         const details = pathDetails[path.name];
                         const Icon = details.icon;
                         return (
-                            <button key={path.id} onClick={() => handlePathClick(path.id)} className={`p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 text-left ${details.bg}`}>
+                            <button key={path.id} onClick={() => handlePathClick(path.id)} className={`p-8 bg-white dark:bg-gray-800/50 ring-1 ring-gray-200 dark:ring-gray-700/50 rounded-2xl shadow-lg hover:shadow-xl hover:shadow-red-500/10 dark:hover:shadow-red-500/10 hover:-translate-y-1.5 transition-all duration-300 text-left ${details.bg}`}>
                                 <Icon className={`w-12 h-12 mb-4 ${details.color}`} />
                                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{path.name}</h3>
                                 <p className="text-gray-600 dark:text-gray-400">{details.description}</p>
