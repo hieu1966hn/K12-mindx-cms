@@ -1,5 +1,4 @@
 
-
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { AppContextType, User, LearningPath, Course, Level, Document, ParentId } from '../types';
 import { INITIAL_DATA } from '../constants';
@@ -12,26 +11,12 @@ interface AppProviderProps {
 }
 
 const generateId = (prefix: string) => `${prefix}-${Date.now()}`;
-const LOCAL_STORAGE_KEY = 'mindx-cms-data';
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  
-  const [data, setData] = useState<LearningPath[]>(() => {
-    try {
-      const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (savedData) {
-        return JSON.parse(savedData);
-      }
-    } catch (error) {
-      console.error("Failed to parse data from localStorage", error);
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
-    }
-    return INITIAL_DATA;
-  });
-
-  const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [data, setData] = useState<LearningPath[]>(INITIAL_DATA);
+  const [selectedPathId, setSelectedPathId] = useState<string | null>(() => localStorage.getItem('selectedPathId'));
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(() => localStorage.getItem('selectedCourseId'));
 
   useEffect(() => {
     // This effect synchronizes the app's theme with the system's theme preference.
@@ -52,14 +37,37 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  // Effect to persist data changes to localStorage
+  // Validate state from localStorage against current data
   useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-    } catch (error) {
-      console.error("Failed to save data to localStorage", error);
+    const path = data.find(p => p.id === selectedPathId);
+    if (!path) {
+        if (selectedPathId !== null) setSelectedPathId(null);
+        if (selectedCourseId !== null) setSelectedCourseId(null);
+        return;
     }
-  }, [data]);
+
+    const course = path.courses.find(c => c.id === selectedCourseId);
+    if (selectedCourseId && !course) {
+        if (selectedCourseId !== null) setSelectedCourseId(null);
+    }
+  }, [data, selectedPathId, selectedCourseId]);
+
+  // Persist selection to localStorage
+  useEffect(() => {
+    if (selectedPathId) {
+        localStorage.setItem('selectedPathId', selectedPathId);
+    } else {
+        localStorage.removeItem('selectedPathId');
+    }
+  }, [selectedPathId]);
+
+  useEffect(() => {
+    if (selectedCourseId) {
+        localStorage.setItem('selectedCourseId', selectedCourseId);
+    } else {
+        localStorage.removeItem('selectedCourseId');
+    }
+  }, [selectedCourseId]);
 
 
   const login = (username: string, pass: string): boolean => {
