@@ -1,5 +1,6 @@
 
 
+
 import React, { useContext, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 import { UI_STRINGS } from '../constants';
@@ -11,6 +12,7 @@ import { EditModal } from './EditModal';
 import { EmptyState } from './common/EmptyState';
 import { CourseCard } from './CourseCard';
 import { CourseDetailView } from './CourseDetailView';
+import { useSwipeBack } from '../hooks/useSwipeBack';
 
 export const MainContent: React.FC = () => {
   const context = useContext(AppContext);
@@ -18,7 +20,7 @@ export const MainContent: React.FC = () => {
 
   if (!context) return null;
 
-  const { selectedPathId, data, currentUser, selectedCourseId, setSelectedCourseId } = context;
+  const { selectedPathId, data, currentUser, selectedCourseId, setSelectedCourseId, setSelectedPathId } = context;
   const selectedPath = data.find(p => p.id === selectedPathId);
   const selectedCourse = selectedPath?.courses.find(c => c.id === selectedCourseId);
   const isAdmin = currentUser?.role === 'admin';
@@ -30,6 +32,16 @@ export const MainContent: React.FC = () => {
   const handleCloseModal = () => {
       setEditingState(null);
   }
+
+  const handleBackToHome = () => {
+    if (setSelectedPathId) {
+      setSelectedPathId(null);
+    }
+  };
+
+  const isCourseListVisible = !!selectedPath && !selectedCourse;
+  const swipeBackRef = useSwipeBack(handleBackToHome, isCourseListVisible);
+
 
   if (!selectedPath) {
     return <HomePage />;
@@ -53,7 +65,7 @@ export const MainContent: React.FC = () => {
 
   return (
     <>
-    <main className="flex-1 p-6 md:p-10 overflow-y-auto animate-fadeIn">
+    <main ref={swipeBackRef} className="flex-1 p-6 md:p-10 overflow-y-auto animate-fadeIn">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
             <div className="flex flex-wrap justify-between items-center gap-4">
