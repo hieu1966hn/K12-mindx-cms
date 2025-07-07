@@ -1,10 +1,11 @@
-import React, { useContext, useCallback, memo } from 'react';
+import { ArrowRight, Calendar, Code, Pencil, Trash2, Users, Wrench } from 'lucide-react';
+import { Course, EditableItem, ItemType, ParentId } from '../types';
+import React, { memo, useCallback, useContext } from 'react';
+
 import { AppContext } from '../context/AppContext';
-import { UI_STRINGS } from '../constants';
-import { Course, ParentId, ItemType, EditableItem } from '../types';
-import { Pencil, Trash2, Calendar, Users, Wrench, ArrowRight } from 'lucide-react';
 import { Badge } from './common/Badge';
 import { MarkdownRenderer } from './common/MarkdownRenderer';
+import { UI_STRINGS } from '../constants';
 
 interface CourseCardProps {
   course: Course;
@@ -109,11 +110,13 @@ export const CourseCard: React.FC<CourseCardProps> = memo(({ course, pathId, onE
         <div className="flex flex-wrap items-center gap-2">
             <Badge colorScheme="orange" icon={Calendar}>Năm {course.year}</Badge>
             <Badge colorScheme="blue" icon={Users}>{course.ageGroup}</Badge>
-            {course.tools?.[0] && (
+            {/* {course.tools?.[0] && (
               <Badge colorScheme="yellow" icon={Wrench}>
                 {course.tools[0]}
               </Badge>
-            )}
+          )} */}
+            {course.language && <Badge colorScheme="green" icon={Code}>{course.language}</Badge>}
+            {course.tools?.map(tool => <Badge key={tool} colorScheme="yellow" icon={Wrench}>{tool}</Badge>)}
         </div>
 
         {/* Mô tả ngắn */}
