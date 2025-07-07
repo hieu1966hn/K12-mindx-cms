@@ -1,49 +1,37 @@
-import React from 'react';
-import xBlack from './x-black.png';
-import xWhite from './x-white.png';
+
+
+import React, { memo } from 'react';
 
 interface LogoProps {
   className?: string;
-  isDarkMode: boolean; // mới thêm
-
 }
 
+// URL của logo cho chế độ sáng và tối
+const LOGO_LIGHT_URL = 'https://w.ladicdn.com/s400x350/5cefbc1ed062e8345a24dfe8/logo-mau-20220824105222.png';
+const LOGO_DARK_URL = 'https://w.ladicdn.com/s450x400/5cefbc1ed062e8345a24dfe8/logo-trang-20220824105223.png';
 
-export const Logo: React.FC<LogoProps> = ({ className, isDarkMode }) => {
+/**
+ * Component Logo hiển thị logo của MindX.
+ * Nó tự động chuyển đổi giữa logo cho chế độ sáng (light mode) và tối (dark mode)
+ * bằng cách sử dụng các lớp CSS của Tailwind CSS (`dark:hidden` và `hidden dark:block`).
+ * `memo` được sử dụng để tối ưu hóa, ngăn component này render lại một cách không cần thiết
+ * nếu props của nó không thay đổi.
+ */
+export const Logo: React.FC<LogoProps> = memo(({ className }) => {
   return (
-    <img
-      src={isDarkMode ? xWhite : xBlack}
-      alt="Logo"
-      className={className}
-    />
+    <div className={className}>
+      {/* Logo cho chế độ sáng, sẽ bị ẩn đi khi ở dark mode */}
+      <img 
+        src={LOGO_LIGHT_URL}
+        alt="MindX Technology School Logo" 
+        className="h-full w-auto dark:hidden"
+      />
+      {/* Logo cho chế độ tối, sẽ được hiển thị khi ở dark mode */}
+      <img 
+        src={LOGO_DARK_URL}
+        alt="MindX Technology School Logo" 
+        className="h-full w-auto hidden dark:block"
+      />
+    </div>
   );
-};
-
-//// Bỏ logo cũ
-// export const Logo: React.FC<LogoProps> = ({ className }) => {
-//   return (
-//     <svg
-//       viewBox="0 0 24 24"
-//       fill="none"
-//       stroke="currentColor"
-//       strokeWidth="1.5"
-//       strokeLinecap="round"
-//       strokeLinejoin="round"
-//       className={className}
-//       xmlns="http://www.w3.org/2000/svg"
-//       aria-label="App Logo"
-//     >
-//       <g className="text-[#E31F26] dark:text-white">
-//         <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v0A2.5 2.5 0 0 1 9.5 7h-3A2.5 2.5 0 0 1 4 4.5v0A2.5 2.5 0 0 1 6.5 2Z" />
-//         <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v0A2.5 2.5 0 0 0 14.5 7h3A2.5 2.5 0 0 0 20 4.5v0A2.5 2.5 0 0 0 17.5 2Z" />
-//         <path d="M6.5 22A2.5 2.5 0 0 1 4 19.5v0A2.5 2.5 0 0 1 6.5 17h3A2.5 2.5 0 0 1 12 19.5v0A2.5 2.5 0 0 1 9.5 22Z" />
-//         <path d="M17.5 22A2.5 2.5 0 0 0 20 19.5v0A2.5 2.5 0 0 0 17.5 17h-3A2.5 2.5 0 0 0 12 19.5v0A2.5 2.5 0 0 0 14.5 22Z" />
-//         <path d="M12 7v10" />
-//         <path d="M9.5 7A2.5 2.5 0 0 1 7 9.5" />
-//         <path d="m14.5 7 a2.5 2.5 0 0 0 2.5 2.5" />
-//         <path d="M9.5 17a2.5 2.5 0 0 0-2.5-2.5" />
-//         <path d="m14.5 17 a2.5 2.5 0 0 1 2.5-2.5" />
-//       </g>
-//     </svg>
-//   );
-// };
+});

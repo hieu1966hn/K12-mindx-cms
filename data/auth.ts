@@ -1,24 +1,8 @@
-
 /**
- * NOTE: Storing plain-text passwords in source code is a major security risk.
- * In a real-world application, you should use a secure authentication provider
- * or store hashed passwords in a database. This is for demonstration purposes only.
+ * DEPRECATED: This file is no longer in use.
+ * User authentication is now handled by Firebase Authentication.
+ * User credentials should be managed in the Firebase console.
+ * For demonstration:
+ * - Admin: admin@test.com / admin123
+ * - User: user@test.com / password123
  */
-type UserCredential = {
-  username: string;
-  password: string;
-  role: 'admin' | 'user';
-}
-
-export const USER_CREDENTIALS: UserCredential[] = [
-  {
-    username: 'admin',
-    password: 'r&dk1@@025',
-    role: 'admin'
-  },
-  {
-    username: 'mindx',
-    password: '123',
-    role: 'user'
-  }
-];

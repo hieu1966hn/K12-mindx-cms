@@ -1,58 +1,84 @@
-import React, { useContext } from 'react';
+
+import React, { useContext, useCallback } from 'react';
 import { Code, Palette, Bot } from 'lucide-react';
 import { UI_STRINGS } from '../constants';
 import { LearningPathName } from '../types';
 import { AppContext } from '../context/AppContext';
+import { MarkdownRenderer } from './common/MarkdownRenderer';
 
+// Đối tượng chứa thông tin chi tiết (icon, mô tả, màu sắc) cho mỗi lộ trình học.
+// Giúp code trong phần render trở nên gọn gàng và dễ quản lý hơn.
 const pathDetails = {
     [LearningPathName.CODING_AI]: {
         icon: Code,
         description: UI_STRINGS.codingAiDesc,
-        color: 'text-blue-500',
-        bg: 'hover:bg-blue-50 dark:hover:bg-blue-900/20'
+        color: 'text-blue-500 dark:text-blue-400',
+        glow: 'hover:shadow-blue-500/20'
     },
     [LearningPathName.ART_DESIGN]: {
         icon: Palette,
         description: UI_STRINGS.artDesignDesc,
-        color: 'text-orange-500',
-        bg: 'hover:bg-orange-50 dark:hover:bg-orange-900/20'
+        color: 'text-orange-500 dark:text-orange-400',
+        glow: 'hover:shadow-orange-500/20'
     },
     [LearningPathName.ROBOTICS]: {
         icon: Bot,
         description: UI_STRINGS.roboticsDesc,
-        color: 'text-green-500',
-        bg: 'hover:bg-green-50 dark:hover:bg-green-900/20'
+        color: 'text-green-500 dark:text-green-400',
+        glow: 'hover:shadow-green-500/20'
     }
 }
 
+/**
+ * Component HomePage là trang mặc định khi người dùng truy cập ứng dụng.
+ * Nó hiển thị các "thẻ" (card) cho mỗi lộ trình học, cho phép người dùng điều hướng.
+ */
 export const HomePage: React.FC = () => {
     const context = useContext(AppContext);
     if(!context) return null;
 
-    const { data, setSelectedPathId, setSelectedCourseId } = context;
+    const { data, setSelectedPathId, setSelectedCourseId, loading } = context;
 
-    const handlePathClick = (pathId: string) => {
-        setSelectedPathId(pathId);
-        setSelectedCourseId(null);
-    }
+    // Hàm xử lý khi người dùng click vào một thẻ lộ trình học.
+    // `useCallback` để tối ưu hóa, tránh tạo lại hàm khi không cần thiết.
+    const handlePathClick = useCallback((pathId: string) => {
+        setSelectedPathId(pathId); // Cập nhật lộ trình đang chọn trong context.
+        setSelectedCourseId(null); // Reset lựa chọn khóa học.
+    }, [setSelectedPathId, setSelectedCourseId]);
     
+    // Nếu đang tải dữ liệu, chỉ hiển thị một div trống để tránh lỗi.
+    if (loading) {
+        return <div className="flex-1 p-8" />;
+    }
+
     return (
-        <main className="flex-1 p-8 overflow-y-auto bg-gray-100 dark:bg-gray-900 animate-fadeIn">
-            <div className="text-center max-w-4xl mx-auto py-10">
-                <h2 className="text-4xl md:text-5xl font-extrabold">
-                    <span className="text-[#E31F26]">MindX Technology School</span>
-                    <span className="text-gray-800 dark:text-gray-200"> - CMS</span>
+        <main className="flex-1 p-8 overflow-y-auto">
+            <div className="text-center max-w-7xl mx-auto py-10">
+                {/* Tiêu đề và phụ đề của trang chủ */}
+                <h2 className="text-4xl md:text-5xl font-extrabold text-[#E31F26]">
+                    MindX CMS
                 </h2>
                 <p className="mt-4 text-lg text-gray-500 dark:text-gray-400">{UI_STRINGS.homeSubtitle}</p>
-                <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
+                
+                {/* Lưới hiển thị các thẻ lộ trình học */}
+                <div className="mt-12 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                     {data.map(path => {
                         const details = pathDetails[path.name];
                         const Icon = details.icon;
                         return (
-                            <button key={path.id} onClick={() => handlePathClick(path.id)} className={`p-8 bg-white dark:bg-gray-800/50 ring-1 ring-gray-200 dark:ring-gray-700/50 rounded-2xl shadow-lg hover:shadow-xl hover:shadow-red-500/10 dark:hover:shadow-red-500/10 hover:-translate-y-1.5 transition-all duration-300 text-left ${details.bg}`}>
-                                <Icon className={`w-12 h-12 mb-4 ${details.color}`} />
-                                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{path.name}</h3>
-                                <p className="text-gray-600 dark:text-gray-400">{details.description}</p>
+                            <button 
+                                key={path.id} 
+                                onClick={() => handlePathClick(path.id)} 
+                                // Các lớp CSS tạo hiệu ứng khi hover và style cho thẻ, thêm flexbox để căn chỉnh nội dung
+                                className={`group p-8 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border border-black/5 dark:border-white/5 rounded-2xl md:hover:-translate-y-2 transition-all duration-300 text-left shadow-lg shadow-gray-400/10 dark:shadow-black/20 ${details.glow} hover:shadow-xl flex flex-col`}
+                            >
+                                <div>
+                                    <Icon className={`w-12 h-12 mb-4 transition-transform duration-300 group-hover:scale-110 ${details.color}`} />
+                                    <h3 className="text-2xl font-bold text-[#E31F26] mb-2">{path.name}</h3>
+                                </div>
+                                <div className="flex-grow">
+                                    <MarkdownRenderer text={details.description} as="p" className="text-gray-600 dark:text-gray-400" />
+                                </div>
                             </button>
                         )
                     })}

@@ -1,63 +1,135 @@
+import React, { createContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
+import { AppContextType, User, LearningPath, Course, Level, Document, ParentId, CmsData, NormalizedLevel, NormalizedCourse, NormalizedLearningPath } from '../types';
+import * as api from '../api/client';
 
-import React, { createContext, useState, useEffect, ReactNode, useMemo } from 'react';
-import { AppContextType, User, LearningPath, Course, Level, Document, ParentId } from '../types';
-import { INITIAL_DATA, UI_STRINGS } from '../constants';
-import { USER_CREDENTIALS } from '../data/auth';
-
+// Tạo Context cho ứng dụng.
 export const AppContext = createContext<AppContextType | null>(null);
 
 interface AppProviderProps {
   children: ReactNode;
 }
 
+// --- Các hàm tiện ích ---
 const generateId = (prefix: string) => `${prefix}-${Date.now()}`;
 const deepCopy = <T,>(obj: T): T => JSON.parse(JSON.stringify(obj));
 
+/**
+ * Hàm này nhận vào cấu trúc CmsData đã được chuẩn hóa và tái tạo lại cấu trúc lồng nhau
+ * mà các component giao diện người dùng (UI) mong đợi.
+ */
+const denormalizeData = (data: CmsData): LearningPath[] => {
+    if (!data || !data.root) return [];
+    try {
+        return data.root.map(pathId => {
+            const path = data.entities.learningPaths[pathId];
+            if (!path) return null;
+            // Sắp xếp các khóa học theo thuộc tính 'year'
+            const sortedCourses = path.courseIds
+                .map(id => data.entities.courses[id])
+                .filter(Boolean)
+                .sort((a, b) => a.year - b.year);
+
+            return {
+                id: path.id,
+                name: path.name,
+                documents: path.documentIds.map(id => data.entities.documents[id]).filter(Boolean),
+                courses: sortedCourses.map(course => {
+                    if (!course) return null;
+                    // By destructuring `pathId` here, it's excluded from `...restOfCourse`
+                    const { documentIds: courseDocIds, levelIds, pathId, ...restOfCourse } = course;
+                    return {
+                        ...restOfCourse,
+                        documents: courseDocIds.map(id => data.entities.documents[id]).filter(Boolean),
+                        levels: levelIds.map(levelId => {
+                            const level = data.entities.levels[levelId];
+                            if (!level) return null;
+                             // By destructuring `courseId` here, it's excluded from `...restOfLevel`
+                            const { documentIds: levelDocIds, courseId, ...restOfLevel } = level;
+                            return {
+                                ...restOfLevel,
+                                documents: levelDocIds.map(id => data.entities.documents[id]).filter(Boolean),
+                            };
+                        }).filter((l): l is Level => l !== null),
+                    };
+                }).filter((c): c is Course => c !== null),
+            };
+        }).filter((p): p is LearningPath => p !== null);
+    } catch(e) {
+        console.error("Failed to denormalize data:", e, data);
+        return [];
+    }
+};
+
+const EMPTY_CMS_DATA: CmsData = {
+    entities: { learningPaths: {}, courses: {}, levels: {}, documents: {} },
+    root: [],
+};
+
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-
-  const [publishedData, setPublishedData] = useState<LearningPath[]>(() => {
-    try {
-        const savedData = localStorage.getItem('cmsData');
-        return savedData ? JSON.parse(savedData) : INITIAL_DATA;
-    } catch (error) {
-        console.error("Failed to load data from localStorage", error);
-        return INITIAL_DATA;
-    }
-  });
-
-  const [draftData, setDraftData] = useState<LearningPath[]>(() => deepCopy(publishedData));
-
+  const [toast, setToast] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [cmsData, setCmsData] = useState<CmsData>(EMPTY_CMS_DATA);
   const [selectedPathId, setSelectedPathId] = useState<string | null>(() => localStorage.getItem('selectedPathId'));
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(() => localStorage.getItem('selectedCourseId'));
 
-  const hasUnsavedChanges = useMemo(() => 
-    JSON.stringify(draftData) !== JSON.stringify(publishedData),
-    [draftData, publishedData]
-  );
+  const denormalizedData = useMemo(() => denormalizeData(cmsData), [cmsData]);
+  
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(null), 4000);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = api.onAuthUserChanged(user => {
+        if (user && user.email) {
+            const ADMIN_EMAILS = ['admin@test.com', 'academic@mindx.vn'];
+            const role = ADMIN_EMAILS.includes(user.email) ? 'admin' : 'user';
+            setCurrentUser({ username: user.email, role });
+        } else {
+            setCurrentUser(null);
+        }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    api.fetchCmsData()
+      .then(data => {
+        setCmsData(data);
+      })
+      .catch(error => {
+        console.error("Failed to fetch initial data", error);
+        showToast("Lỗi: Không thể tải dữ liệu từ Firebase.");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [showToast]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
-      if (e.matches) document.documentElement.classList.add('dark');
-      else document.documentElement.classList.remove('dark');
+      document.documentElement.classList.toggle('dark', e.matches);
     };
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
   useEffect(() => {
-    const path = draftData.find(p => p.id === selectedPathId);
-    if (!path) {
-        if (selectedPathId !== null) setSelectedPathId(null);
-        if (selectedCourseId !== null) setSelectedCourseId(null);
-        return;
+    if (loading) return;
+    if (!selectedPathId || !cmsData.entities.learningPaths[selectedPathId]) {
+      if (selectedPathId !== null) setSelectedPathId(null);
+      if (selectedCourseId !== null) setSelectedCourseId(null);
+      return;
     }
-    const course = path.courses.find(c => c.id === selectedCourseId);
-    if (selectedCourseId && !course) {
-        if (selectedCourseId !== null) setSelectedCourseId(null);
+    const path = cmsData.entities.learningPaths[selectedPathId];
+    const courseExists = selectedCourseId && cmsData.entities.courses[selectedCourseId];
+    const courseInPath = courseExists && path.courseIds.includes(selectedCourseId);
+    if (selectedCourseId && !courseInPath) {
+        setSelectedCourseId(null);
     }
-  }, [draftData, selectedPathId, selectedCourseId]);
+  }, [loading, cmsData, selectedPathId, selectedCourseId]);
 
   useEffect(() => {
     if (selectedPathId) localStorage.setItem('selectedPathId', selectedPathId);
@@ -69,116 +141,238 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     else localStorage.removeItem('selectedCourseId');
   }, [selectedCourseId]);
 
-  const saveChanges = () => {
-    setPublishedData(draftData);
-    localStorage.setItem('cmsData', JSON.stringify(draftData));
-  };
-
-  const discardChanges = () => {
-    setDraftData(deepCopy(publishedData));
-  };
-
-  const login = (username: string, pass: string): boolean => {
-    const foundUser = USER_CREDENTIALS.find(
-      (cred) => cred.username.toLowerCase() === username.toLowerCase() && cred.password === pass
-    );
-    if (foundUser) {
-      setCurrentUser({ username: foundUser.username, role: foundUser.role });
+  const login = useCallback(async (email: string, pass: string): Promise<boolean> => {
+    try {
+      await api.login(email, pass);
       return true;
+    } catch (error) {
+      console.error(error);
+      return false;
     }
-    return false;
-  };
+  }, []);
 
-  const logout = () => {
-    if (hasUnsavedChanges) {
-      if (window.confirm("Bạn có các thay đổi chưa được lưu. Bạn có muốn hủy bỏ chúng và đăng xuất không?")) {
-        discardChanges();
-        setCurrentUser(null);
-      }
-    } else {
-      setCurrentUser(null);
+  const logout = useCallback(async () => {
+    try {
+        await api.logout();
+    } catch (error) {
+        console.error("Error signing out: ", error);
+        showToast("Đăng xuất thất bại.");
     }
-  };
+  }, [showToast]);
 
-  const addCourse = (pathId: string, courseData: Omit<Course, 'id' | 'levels' | 'documents'>) => {
-    const newCourse: Course = { ...courseData, id: generateId('c'), levels: [], documents: [] };
-    setDraftData(d => d.map(p => p.id === pathId ? { ...p, courses: [...p.courses, newCourse] } : p));
-  };
+  /**
+   * Một hàm xử lý chung cho các hoạt động CRUD để thực hiện "cập nhật lạc quan" (optimistic UI update).
+   * Nó cập nhật giao diện người dùng ngay lập tức, sau đó thực hiện lệnh gọi API.
+   * Nếu lệnh gọi API thất bại, nó sẽ hoàn tác trạng thái về trạng thái tốt đã biết cuối cùng.
+   */
+  const optimisticUpdate = useCallback(async (
+    updateFunction: (state: CmsData) => CmsData,
+    apiCall: () => Promise<any>,
+    successMessage: string,
+    errorMessage: string
+  ) => {
+    const originalState = cmsData;
+    const newState = updateFunction(deepCopy(originalState));
+    setCmsData(newState);
 
-  const updateCourse = (pathId: string, courseId: string, updates: Partial<Course>) => {
-    setDraftData(d => d.map(p => p.id === pathId ? { ...p, courses: p.courses.map(c => c.id === courseId ? {...c, ...updates} : c) } : p));
-  };
+    try {
+      await apiCall();
+      showToast(successMessage);
+    } catch (error) {
+      console.error(errorMessage, error);
+      showToast(`Lỗi: ${errorMessage}`);
+      setCmsData(originalState);
+    }
+  }, [cmsData, showToast]);
 
-  const deleteCourse = (pathId: string, courseId: string) => {
-    setDraftData(d => d.map(p => p.id === pathId ? { ...p, courses: p.courses.filter(c => c.id !== courseId) } : p));
-  };
+  const addCourse = useCallback(async (pathId: string, courseData: Omit<Course, 'id' | 'levels' | 'documents'>) => {
+    const newCourseId = generateId('c');
+    await optimisticUpdate(
+      state => {
+        const newCourse: NormalizedCourse = { ...courseData, id: newCourseId, pathId: pathId, levelIds: [], documentIds: [] };
+        state.entities.courses[newCourse.id] = newCourse;
+        state.entities.learningPaths[pathId]?.courseIds.push(newCourse.id);
+        return state;
+      },
+      () => api.addCourseToDb(newCourseId, pathId, courseData),
+      'Thêm khóa học thành công!',
+      'Không thể thêm khóa học'
+    );
+  }, [optimisticUpdate]);
+
+  const updateCourse = useCallback(async (pathId: string, courseId: string, updates: Partial<Course>) => {
+    await optimisticUpdate(
+      state => {
+        const course = state.entities.courses[courseId];
+        if (course) state.entities.courses[courseId] = { ...course, ...updates };
+        return state;
+      },
+      () => api.updateCourseInDb(courseId, updates),
+      'Cập nhật khóa học thành công!',
+      'Không thể cập nhật khóa học'
+    );
+  }, [optimisticUpdate]);
+
+  const deleteCourse = useCallback(async (pathId: string, courseId: string) => {
+    await optimisticUpdate(
+      state => {
+        const courseToDelete = state.entities.courses[courseId];
+        if (!courseToDelete) return state;
+
+        courseToDelete.levelIds.forEach(levelId => {
+          state.entities.levels[levelId]?.documentIds.forEach(docId => delete state.entities.documents[docId]);
+          delete state.entities.levels[levelId];
+        });
+        courseToDelete.documentIds.forEach(docId => delete state.entities.documents[docId]);
+
+        const path = state.entities.learningPaths[pathId];
+        if (path) path.courseIds = path.courseIds.filter(id => id !== courseId);
+        
+        delete state.entities.courses[courseId];
+        return state;
+      },
+      () => api.deleteCourseFromDb(courseId),
+      'Xóa khóa học thành công!',
+      'Không thể xóa khóa học'
+    );
+  }, [optimisticUpdate]);
   
-  const addLevel = (pathId: string, courseId: string, levelData: Omit<Level, 'id' | 'documents'>) => {
-    const newLevel: Level = { ...levelData, id: generateId('l'), documents: [] };
-    setDraftData(d => d.map(p => p.id === pathId ? { ...p, courses: p.courses.map(c => c.id === courseId ? { ...c, levels: [...c.levels, newLevel] } : c) } : p));
-  };
+  const addLevel = useCallback(async (pathId: string, courseId: string, levelData: Omit<Level, 'id' | 'documents'>) => {
+    const newLevelId = generateId('l');
+    await optimisticUpdate(
+      state => {
+        const newLevel: NormalizedLevel = { ...levelData, id: newLevelId, courseId: courseId, documentIds: [] };
+        state.entities.levels[newLevel.id] = newLevel;
+        state.entities.courses[courseId]?.levelIds.push(newLevel.id);
+        return state;
+      },
+      () => api.addLevelToDb(newLevelId, courseId, levelData),
+      'Thêm cấp độ thành công!',
+      'Không thể thêm cấp độ'
+    );
+  }, [optimisticUpdate]);
 
-  const updateLevel = (pathId: string, courseId: string, levelId: string, updates: Partial<Level>) => {
-    setDraftData(d => d.map(p => p.id === pathId ? { ...p, courses: p.courses.map(c => c.id === courseId ? { ...c, levels: c.levels.map(l => l.id === levelId ? {...l, ...updates} : l) } : c) } : p));
-  };
+  const updateLevel = useCallback(async (pathId: string, courseId: string, levelId: string, updates: Partial<Level>) => {
+    await optimisticUpdate(
+      state => {
+        const level = state.entities.levels[levelId];
+        if (level) state.entities.levels[levelId] = { ...level, ...updates };
+        return state;
+      },
+      () => api.updateLevelInDb(levelId, updates),
+      'Cập nhật cấp độ thành công!',
+      'Không thể cập nhật cấp độ'
+    );
+  }, [optimisticUpdate]);
 
-  const deleteLevel = (pathId: string, courseId: string, levelId: string) => {
-    setDraftData(d => d.map(p => p.id === pathId ? { ...p, courses: p.courses.map(c => c.id === courseId ? { ...c, levels: c.levels.filter(l => l.id !== levelId) } : c) } : p));
-  };
+  const deleteLevel = useCallback(async (pathId: string, courseId: string, levelId: string) => {
+    await optimisticUpdate(
+      state => {
+        const levelToDelete = state.entities.levels[levelId];
+        if (!levelToDelete) return state;
+        levelToDelete.documentIds.forEach(docId => delete state.entities.documents[docId]);
+        const course = state.entities.courses[courseId];
+        if (course) course.levelIds = course.levelIds.filter(id => id !== levelId);
+        delete state.entities.levels[levelId];
+        return state;
+      },
+      () => api.deleteLevelFromDb(levelId),
+      'Xóa cấp độ thành công!',
+      'Không thể xóa cấp độ'
+    );
+  }, [optimisticUpdate]);
 
-  const addDocument = (parentId: ParentId, documentData: Omit<Document, 'id'>) => {
-    const newDocument: Document = { ...documentData, id: generateId('doc') };
-    const {pathId, courseId, levelId} = parentId;
-    setDraftData(d => d.map(p => {
-        if (p.id !== pathId) return p;
-        if (!courseId) return { ...p, documents: [...p.documents, newDocument] };
-        return { ...p, courses: p.courses.map(c => {
-          if (c.id !== courseId) return c;
-          if (!levelId) return { ...c, documents: [...c.documents, newDocument] };
-          return { ...c, levels: c.levels.map(l => l.id !== levelId ? l : { ...l, documents: [...l.documents, newDocument] }) };
-        })};
-    }));
-  };
+  const addDocument = useCallback(async (parentId: ParentId, documentData: Omit<Document, 'id'>) => {
+    const newDocId = generateId('doc');
+    await optimisticUpdate(
+      state => {
+        const newDocument: Document = { ...documentData, id: newDocId };
+        state.entities.documents[newDocument.id] = newDocument;
+        const { pathId, courseId, levelId } = parentId;
+        if (levelId && courseId) {
+          state.entities.levels[levelId]?.documentIds.push(newDocument.id);
+        } else if (courseId) {
+          state.entities.courses[courseId]?.documentIds.push(newDocument.id);
+        } else {
+          state.entities.learningPaths[pathId]?.documentIds.push(newDocument.id);
+        }
+        return state;
+      },
+      () => api.addDocumentToDb(newDocId, parentId, documentData),
+      'Thêm tài liệu thành công!',
+      'Không thể thêm tài liệu'
+    );
+  }, [optimisticUpdate]);
   
-  const updateDocument = (parentId: ParentId, documentId: string, updates: Partial<Document>) => {
-    const {pathId, courseId, levelId} = parentId;
-    setDraftData(d => d.map(p => {
-        if (p.id !== pathId) return p;
-        if (!courseId) return { ...p, documents: p.documents.map(doc => doc.id === documentId ? {...doc, ...updates} : doc) };
-        return { ...p, courses: p.courses.map(c => {
-          if (c.id !== courseId) return c;
-          if (!levelId) return { ...c, documents: c.documents.map(doc => doc.id === documentId ? {...doc, ...updates} : doc) };
-          return { ...c, levels: c.levels.map(l => l.id !== levelId ? l : { ...l, documents: l.documents.map(doc => doc.id === documentId ? {...doc, ...updates} : doc) }) };
-        })};
-    }));
-  };
+  const updateDocument = useCallback(async (parentId: ParentId, documentId: string, updates: Partial<Document>) => {
+    await optimisticUpdate(
+      state => {
+        const doc = state.entities.documents[documentId];
+        if(doc) state.entities.documents[documentId] = { ...doc, ...updates };
+        return state;
+      },
+      () => api.updateDocumentInDb(documentId, updates),
+      'Cập nhật tài liệu thành công!',
+      'Không thể cập nhật tài liệu'
+    );
+  }, [optimisticUpdate]);
 
-  const deleteDocument = (parentId: ParentId, documentId: string) => {
-    const {pathId, courseId, levelId} = parentId;
-    setDraftData(d => d.map(p => {
-        if (p.id !== pathId) return p;
-        if (!courseId) return { ...p, documents: p.documents.filter(doc => doc.id !== documentId) };
-        return { ...p, courses: p.courses.map(c => {
-          if (c.id !== courseId) return c;
-          if (!levelId) return { ...c, documents: c.documents.filter(doc => doc.id !== documentId) };
-          return { ...c, levels: c.levels.map(l => l.id !== levelId ? l : { ...l, documents: l.documents.filter(doc => doc.id !== documentId) }) };
-        })};
-    }));
-  };
+  const deleteDocument = useCallback(async (parentId: ParentId, documentId: string) => {
+     await optimisticUpdate(
+      state => {
+        const { pathId, courseId, levelId } = parentId;
+        if (levelId && courseId) {
+          const level = state.entities.levels[levelId];
+          if (level) level.documentIds = level.documentIds.filter(id => id !== documentId);
+        } else if (courseId) {
+          const course = state.entities.courses[courseId];
+          if (course) course.documentIds = course.documentIds.filter(id => id !== documentId);
+        } else {
+          const path = state.entities.learningPaths[pathId];
+          if (path) path.documentIds = path.documentIds.filter(id => id !== documentId);
+        }
+        delete state.entities.documents[documentId];
+        return state;
+      },
+      () => api.deleteDocumentFromDb(documentId),
+      'Xóa tài liệu thành công!',
+      'Không thể xóa tài liệu'
+    );
+  }, [optimisticUpdate]);
+
+  const reorderDocuments = useCallback(async (parentId: ParentId, orderedIds: string[]) => {
+    await optimisticUpdate(
+        state => {
+            const { pathId, courseId, levelId } = parentId;
+            let parent: NormalizedLearningPath | NormalizedCourse | NormalizedLevel | undefined;
+
+            if (levelId && courseId) {
+                parent = state.entities.levels[levelId];
+            } else if (courseId) {
+                parent = state.entities.courses[courseId];
+            } else {
+                parent = state.entities.learningPaths[pathId];
+            }
+            if (parent) {
+                parent.documentIds = orderedIds;
+            }
+            return state;
+        },
+        () => api.reorderDocumentsInDb(parentId, orderedIds),
+        'Sắp xếp tài liệu thành công!',
+        'Không thể sắp xếp tài liệu'
+    );
+  }, [optimisticUpdate]);
 
   const contextValue: AppContextType = {
     currentUser,
     login,
     logout,
-    data: draftData,
-    setData: setDraftData,
+    data: denormalizedData,
     selectedPathId,
     setSelectedPathId,
     selectedCourseId,
     setSelectedCourseId,
-    hasUnsavedChanges,
-    saveChanges,
-    discardChanges,
     addCourse,
     updateCourse,
     deleteCourse,
@@ -188,6 +382,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     addDocument,
     updateDocument,
     deleteDocument,
+    reorderDocuments,
+    toast,
+    showToast,
+    loading,
   };
 
   return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
