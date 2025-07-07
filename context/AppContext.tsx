@@ -1,6 +1,7 @@
-import React, { createContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
-import { AppContextType, User, LearningPath, Course, Level, Document, ParentId, CmsData, NormalizedLevel, NormalizedCourse, NormalizedLearningPath } from '../types';
 import * as api from '../api/client';
+
+import { AppContextType, CmsData, Course, Document, LearningPath, Level, LevelName, NormalizedCourse, NormalizedLearningPath, NormalizedLevel, ParentId, User } from '../types';
+import React, { ReactNode, createContext, useCallback, useEffect, useMemo, useState } from 'react';
 
 // Tạo Context cho ứng dụng.
 export const AppContext = createContext<AppContextType | null>(null);
@@ -187,15 +188,50 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   const addCourse = useCallback(async (pathId: string, courseData: Omit<Course, 'id' | 'levels' | 'documents'>) => {
     const newCourseId = generateId('c');
+    
+    // Tạo 3 cấp độ mặc định
+    const defaultLevelsData = [
+      { name: LevelName.BASIC, content: 'Nội dung cấp độ cơ bản.', objectives: 'Mục tiêu cấp độ cơ bản.' },
+      { name: LevelName.ADVANCED, content: 'Nội dung cấp độ nâng cao.', objectives: 'Mục tiêu cấp độ nâng cao.' },
+      { name: LevelName.INTENSIVE, content: 'Nội dung cấp độ chuyên sâu.', objectives: 'Mục tiêu cấp độ chuyên sâu.' }
+    ];
+
+    const newLevels = defaultLevelsData.map(data => ({
+      id: generateId('l'),
+      data: data
+    }));
+
+    const newLevelIds = newLevels.map(l => l.id);
+
     await optimisticUpdate(
       state => {
-        const newCourse: NormalizedCourse = { ...courseData, id: newCourseId, pathId: pathId, levelIds: [], documentIds: [] };
+        // Tạo khóa học mới với ID của các cấp độ đã tạo
+        const newCourse: NormalizedCourse = { 
+          ...courseData, 
+          id: newCourseId, 
+          pathId: pathId, 
+          levelIds: newLevelIds, 
+          documentIds: [] 
+        };
         state.entities.courses[newCourse.id] = newCourse;
         state.entities.learningPaths[pathId]?.courseIds.push(newCourse.id);
+
+        // Thêm các cấp độ mới vào state
+        newLevels.forEach(level => {
+          const newLevel: NormalizedLevel = {
+            ...level.data,
+            id: level.id,
+            courseId: newCourseId,
+            documentIds: []
+          };
+          state.entities.levels[level.id] = newLevel;
+        });
+
         return state;
       },
-      () => api.addCourseToDb(newCourseId, pathId, courseData),
-      'Thêm khóa học thành công!',
+      // Gọi hàm API mới để lưu cả khóa học và các cấp độ
+      () => api.addCourseWithLevelsToDb(newCourseId, pathId, courseData, newLevels),
+      'Thêm khóa học và các cấp độ mặc định thành công!',
       'Không thể thêm khóa học'
     );
   }, [optimisticUpdate]);

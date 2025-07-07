@@ -1,21 +1,22 @@
-import { CmsData, LearningPath, Course, Level, Document, ParentId, NormalizedCourse, NormalizedLevel } from '../types';
-import { 
-    db, 
-    auth, 
-    collection, 
-    doc, 
-    getDoc, 
-    getDocs, 
-    writeBatch,
+import { CmsData, Course, Document, LearningPath, Level, NormalizedCourse, NormalizedLevel, ParentId } from '../types';
+import {
+    auth,
+    collection,
+    db,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    onAuthStateChanged,
+    query,
     setDoc,
     signInWithEmailAndPassword,
     signOut,
-    onAuthStateChanged,
-    query,
-    where,
     updateDoc,
-    deleteDoc
+    where,
+    writeBatch
 } from '../firebase/config';
+
 import type { FirebaseUser } from '../firebase/config';
 
 /**
@@ -120,6 +121,25 @@ export const deleteCourseFromDb = async (courseId: string): Promise<void> => {
     levelsSnap.forEach(l => batch.delete(l.ref));
 
     batch.delete(doc(db, 'courses', courseId));
+    await batch.commit();
+};
+
+export const addCourseWithLevelsToDb = async (
+    courseId: string, 
+    pathId: string, 
+    courseData: Omit<Course, 'id' | 'levels' | 'documents'>,
+    levels: { id: string; data: Omit<Level, 'id' | 'documents'>; }[]
+): Promise<void> => {
+    const batch = writeBatch(db);
+
+    const courseRef = doc(db, 'courses', courseId);
+    batch.set(courseRef, { ...courseData, pathId, id: courseId });
+    
+    levels.forEach(level => {
+        const levelRef = doc(db, 'levels', level.id);
+        batch.set(levelRef, { ...level.data, courseId, id: level.id });
+    });
+
     await batch.commit();
 };
 

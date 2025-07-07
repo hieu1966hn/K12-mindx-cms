@@ -1,12 +1,13 @@
-import React, { useContext, useState, useCallback, memo, useRef } from 'react';
+import { ArrowLeft, BarChartHorizontal, BarChartHorizontalBig, BookOpen, Calendar, CheckCircle, Code, FileText, Files, Layers, Pencil, PlusCircle, Trash2, Users, Wrench, Zap } from 'lucide-react';
+import { Course, Document, EditableItem, ItemType, LearningPath, Level, LevelName, ParentId } from '../types';
+import React, { memo, useCallback, useContext, useRef, useState } from 'react';
+
 import { AppContext } from '../context/AppContext';
-import { Course, LearningPath, Level, EditableItem, ItemType, ParentId, Document, LevelName } from '../types';
-import { UI_STRINGS } from '../constants';
-import { DocumentLink } from './DocumentLink';
 import { Badge } from './common/Badge';
-import { Pencil, Trash2, PlusCircle, Calendar, Users, Wrench, Code, ArrowLeft, BookOpen, FileText, Layers, CheckCircle, Files, BarChartHorizontal, BarChartHorizontalBig, Zap } from 'lucide-react';
-import { useSwipeBack } from '../hooks/useSwipeBack';
+import { DocumentLink } from './DocumentLink';
 import { MarkdownRenderer } from './common/MarkdownRenderer';
+import { UI_STRINGS } from '../constants';
+import { useSwipeBack } from '../hooks/useSwipeBack';
 
 // --- Các component con để cấu trúc code tốt hơn và dễ đọc hơn ---
 
@@ -137,17 +138,31 @@ const LevelsCard: React.FC<{
     onDeleteLevel: (levelId: string) => void;
     dnd: DraggableProps;
 }> = memo(({ course, pathId, isAdmin, onEdit, onDeleteLevel, dnd }) => {
-    // State để theo dõi cấp độ nào đang được chọn để hiển thị chi tiết.
-    const [selectedLevelId, setSelectedLevelId] = useState<string | null>(course.levels[0]?.id || null);
+    // Định nghĩa thứ tự hiển thị mong muốn cho các cấp độ
+    const levelOrder: Record<string, number> = {
+        [LevelName.BASIC]: 1,
+        [LevelName.ADVANCED]: 2,
+        [LevelName.INTENSIVE]: 3,
+    };
+
+    // Sắp xếp các cấp độ dựa trên thứ tự đã định nghĩa
+    const sortedLevels = [...course.levels].sort((a, b) => {
+        const orderA = levelOrder[a.name] || 99;
+        const orderB = levelOrder[b.name] || 99;
+        return orderA - orderB;
+    });
+
+    // State để theo dõi cấp độ nào đang được chọn, mặc định là cấp độ đầu tiên trong danh sách đã sắp xếp
+    const [selectedLevelId, setSelectedLevelId] = useState<string | null>(sortedLevels[0]?.id || null);
 
     const handleLevelSelect = (levelId: string) => {
         setSelectedLevelId(levelId);
     };
 
-    if (!course.levels.length && !isAdmin) return null;
+    if (!sortedLevels.length && !isAdmin) return null;
 
-    const selectedLevelIndex = course.levels.findIndex(level => level.id === selectedLevelId);
-    const progressWidth = course.levels.length > 0 ? ((selectedLevelIndex + 1) / course.levels.length) * 100 : 0;
+    const selectedLevelIndex = sortedLevels.findIndex(level => level.id === selectedLevelId);
+    const progressWidth = sortedLevels.length > 0 ? ((selectedLevelIndex + 1) / sortedLevels.length) * 100 : 0;
 
     return (
         <div className="lg:col-span-1">
@@ -166,7 +181,7 @@ const LevelsCard: React.FC<{
                 {/* Các tab để chuyển đổi giữa các cấp độ */}
                 <div className="w-full">
                     <div className="flex justify-between items-center gap-2 md:gap-4 mb-2">
-                        {course.levels.map(level => {
+                        {sortedLevels.map(level => {
                             const isSelected = selectedLevelId === level.id;
                             const Icon = levelIcons[level.name as LevelName] || FileText;
                             return (
@@ -199,7 +214,7 @@ const LevelsCard: React.FC<{
 
                 {/* Nội dung chi tiết của cấp độ được chọn */}
                 <div className="mt-4 min-h-[200px]">
-                    {course.levels.map(level => (
+                    {sortedLevels.map(level => (
                         <div key={level.id} role="tabpanel" hidden={selectedLevelId !== level.id} className={selectedLevelId === level.id ? 'animate-fade-in' : ''}>
                             {selectedLevelId === level.id && (
                                 <div className="bg-gray-100/70 dark:bg-gray-900/40 p-5 rounded-lg relative">
